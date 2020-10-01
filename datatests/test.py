@@ -1,18 +1,6 @@
 import csv
 import datetime as dt
-
-with open('etherprice-from-etherscan.csv') as f:
-    reader = csv.reader(f, delimiter=',')
-    data = list(reader)
-
-data = data[1:] #remove column headings
-
-data = [
-    [
-        dt.datetime.fromtimestamp(int(i[1])),
-        float(i[2])
-    ] for i in data
-]
+import matplotlib.pyplot as plt
 
 class CurrencyPair:
     def __init__(self, v1_amount, v2_amount, ratio=0.5):
@@ -31,21 +19,46 @@ class CurrencyPair:
     def get_total_value(self, v1_price, v2_price):
         return self.v1 * v1_price + self.v2 * v2_price
 
-redata = data[-365:]
-#redata = redata + redata[::-1] #start and end at the same price
-redata.append(redata[0]) #crash to initial price right at the end
+
+def get_data():
+
+    with open('etherprice-from-etherscan.csv') as f:
+        reader = csv.reader(f, delimiter=',')
+        data = list(reader)
+
+    data = data[1:] #remove column headings
+
+    data = [
+        [
+            dt.datetime.fromtimestamp(int(i[1])),
+            float(i[2])
+        ] for i in data
+    ]
+
+    return data
+
+data = get_data()[-365:] #only last year of prices
+#data = data + data[::-1] #start and end at the same price
+#data.append(data[0]) #crash to initial price right at the end
 
 #example eth/usdt pair, starting with 100 usdt
 
-pools = [i/20 for i in range(0, 21)]
-pools = [CurrencyPair(0, 100, i) for i in pools]
+if __name__ == '__main__':
+    pools = [i/100 for i in range(0, 101)]
+    pools = [CurrencyPair(0, 100, ratio=i) for i in pools]
 
-for date, price in redata:
+    for date, price in data:
+        for p in pools:
+            p.balance(price, 1)
+
+    final_price = data[-1][1]
+    print('Ratio\tFinal ETH\tFinal USD\tFinal Total')
     for p in pools:
-        p.balance(price, 1)
+        #print(f'{p.ratio}\t{p.v1}\t{p.v2}\t{p.get_total_value(final_price, 1)}')
+        print('{:.2f}\t{:.2f}\t\t{:.2f}\t\t{:.2f}'.format(p.ratio, p.v1, p.v2, p.get_total_value(final_price, 1)))
 
-final_price = redata[-1][1]
-print('Ratio\tFinal ETH\tFinal USD\tTotal')
-for p in pools:
-    #print(f'{p.ratio}\t{p.v1}\t{p.v2}\t{p.get_total_value(final_price, 1)}')
-    print('{:.2f}\t{:.2f}\t\t{:.2f}\t\t{:.2f}'.format(p.ratio, p.v1, p.v2, p.get_total_value(final_price, 1)))
+    plt.plot([p.ratio for p in pools], [p.get_total_value(final_price, 1) for p in pools])
+    plt.ylabel('Total value (USD)')
+    plt.xlabel('Balancing Ratio (ETH/USDT)')
+    plt.title('Pool balancing ratio vs final total value')
+    plt.show()
